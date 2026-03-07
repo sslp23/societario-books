@@ -1,0 +1,5 @@
+reflex==0.8.22
+alembic
+fpdf2
+bcrypt
+psycopg2-binary

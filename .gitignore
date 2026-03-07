@@ -1,0 +1,11 @@
+*.db
+*.py[cod]
+.web
+assets/external/
+__pycache__/
+.states
+rxconfig.py
+seed_user.py
+setup_user.py
+.venv
+venv
