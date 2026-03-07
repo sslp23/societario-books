@@ -2,6 +2,7 @@ import reflex as rx
 from datetime import datetime
 from fpdf import FPDF
 import os
+import tempfile
 import bcrypt
 from sqlalchemy import select
 from typing import List
@@ -305,29 +306,33 @@ class AppState(rx.State):
         self.entries_version += 1
 
     def download_book_entries_pdf(self):
-        """Generates and downloads a PDF table of all entries in the selected book."""
+        """Generates the PDF and sends it to the browser for download."""
         if self.selected_book_id == 0:
             return
         with rx.session() as session:
+            book = session.get(Book, self.selected_book_id)
+            if not book:
+                return
             entries = session.exec(
                 select(BookEntry).where(BookEntry.book_id == self.selected_book_id)
             ).all()
-            entries = [e[0] for e in entries]
-
-        file_name = f"livro_{self.selected_book_id}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
-        # .web/public/ is what the Vite dev server actually serves at the root URL
-        public_dir = os.path.join(
-            os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-            ".web", "public",
-        )
-        os.makedirs(public_dir, exist_ok=True)
-        _generate_book_pdf(
-            book_name=self.selected_book_name,
-            organization=self.user_organization,
-            entries=entries,
-            file_path=os.path.join(public_dir, file_name),
-        )
-        return rx.download(url=f"/{file_name}")
+            entries_list = [e[0] for e in entries]
+            book_name = book.name
+            org = book.organization
+        with tempfile.NamedTemporaryFile(suffix=".pdf", delete=False) as tmp:
+            tmp_path = tmp.name
+        try:
+            _generate_book_pdf(
+                book_name=book_name,
+                organization=org,
+                entries=entries_list,
+                file_path=tmp_path,
+            )
+            with open(tmp_path, "rb") as f:
+                pdf_bytes = f.read()
+        finally:
+            os.unlink(tmp_path)
+        return rx.download(data=pdf_bytes, filename=f"livro_{self.selected_book_id}.pdf")
 
 
 # --- 2. UI Components ---
